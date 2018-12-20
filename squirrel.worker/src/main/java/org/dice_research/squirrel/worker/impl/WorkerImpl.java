@@ -3,11 +3,9 @@ package org.dice_research.squirrel.worker.impl;
 import java.io.Closeable;
 import java.io.File;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.dice_research.squirrel.Constants;
 import org.dice_research.squirrel.analyzer.Analyzer;
@@ -35,7 +33,8 @@ import org.dice_research.squirrel.utils.TempPathUtils;
 import org.dice_research.squirrel.worker.Worker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.concurrent.Future;
 
 /**
  * Standard implementation of the {@link Worker} interface.
@@ -130,6 +129,8 @@ public class WorkerImpl implements Worker, Closeable {
         analyzer = new SimpleOrderedAnalyzerManager(collector);
     }
 
+
+
     @Override
     public void run() {
         terminateFlag = false;
@@ -214,16 +215,18 @@ public class WorkerImpl implements Worker, Closeable {
         frontier.crawlingDone(uris);
     }
 
+
+
     @Override
     public void performCrawling(CrawleableUri uri) {
         // Create the activity object for this URI
         uri.addData(Constants.UUID_KEY, UUID.randomUUID().toString());
         CrawlingActivity activity = new CrawlingActivity(uri, getUri());
         uri.addData(Constants.URI_CRAWLING_ACTIVITY, activity);
-        
+
         // Check robots.txt
         if (manager.isUriCrawlable(uri.getUri())) {
-            // Make sure that there is a delay between the fetching of two URIs 
+            // Make sure that there is a delay between the fetching of two URIs
             try {
                 long delay = timeStampLastUriFetched
                         - (System.currentTimeMillis() + manager.getMinWaitingTime(uri.getUri()));
@@ -233,7 +236,10 @@ public class WorkerImpl implements Worker, Closeable {
             } catch (InterruptedException e) {
                 LOGGER.warn("Delay before crawling \"" + uri.getUri().toString() + "\" interrupted.", e);
             }
-            
+
+
+
+
             // Fetch the URI content
             LOGGER.debug("I start crawling {} now...", uri);
             File fetched = null;
@@ -250,8 +256,19 @@ public class WorkerImpl implements Worker, Closeable {
             } else {
                 fetchedFiles.add(fetched);
             }
+              //Approach 1
+//            ExecutorService service = Executors.newCachedThreadPool();
+//            try {
+//                Future<Iterator<byte[]>> future = service.submit(new Approach1(fetched, uri, analyzer, sink));
+//                service.shutdown();
+//                sendNewUris(future.get());
+//            }
+//
+//            catch(Exception e) {
+//                e.printStackTrace();
+//            }
 
-            // If there is at least one file
+//             If there is at least one file
             if (fetchedFiles.size() > 0) {
                 FileManager fm = new FileManager();
                 List<File> fileList;
@@ -264,16 +281,21 @@ public class WorkerImpl implements Worker, Closeable {
                         if (data != null) {
                             fileList = fm.decompressFile(data);
                             for (File file : fileList) {
-                                Iterator<byte[]> resultUris = analyzer.analyze(uri, file, sink);
-                                sendNewUris(resultUris);
+//                                Iterator<byte[]> resultUris = analyzer.analyze(uri, file, sink);
+//                                sendNewUris(resultUris);
+                                ExecutorService service = Executors.newCachedThreadPool();//Approach 2
+                                Future<Iterator<byte[]>> future = service.submit(new Approach2(file, uri, analyzer, sink));
+                                service.shutdown();
+                                sendNewUris(future.get());
                             }
                         }
                     }
-                } catch (Exception e) {
+                }
+                catch (Exception e) {
                     activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
                     activity.setState(CrawlingURIState.FAILED);
                     activity.finishActivity(sink);
-                    throw e;
+ //                   throw e;      ### WRITE LOGIC TO HANDLE THE EXCEPTIONS THROWN BY EXECUTOR SERVICE
                 } finally {
                     // We don't want to handle any exception. Just make sure that sink and collector
                     // do not handle this uri anymore.
