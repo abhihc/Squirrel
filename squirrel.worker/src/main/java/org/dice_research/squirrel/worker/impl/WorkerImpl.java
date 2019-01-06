@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -237,7 +238,17 @@ public class WorkerImpl implements Worker, Closeable {
                 LOGGER.warn("Delay before crawling \"" + uri.getUri().toString() + "\" interrupted.", e);
             }
 
-
+//            //Approach 3
+//            ExecutorService service = Executors.newCachedThreadPool();
+//            try {
+//                Future<Iterator<byte[]>> future = service.submit(new Approach3(uri, fetcher, analyzer, sink));
+//                service.shutdown();
+//                sendNewUris(future.get());
+//            }
+//
+//            catch(Exception e) {
+//                e.printStackTrace();
+//            }
 
 
             // Fetch the URI content
@@ -250,13 +261,8 @@ public class WorkerImpl implements Worker, Closeable {
                 activity.addStep(getClass(), "Exception while Fetching Data. " + e.getMessage());
             }
             timeStampLastUriFetched = System.currentTimeMillis();
-            List<File> fetchedFiles = new ArrayList<>();
-            if (fetched != null && fetched.isDirectory()) {
-                fetchedFiles.addAll(TempPathUtils.searchPath4Files(fetched));
-            } else {
-                fetchedFiles.add(fetched);
-            }
-              //Approach 1
+
+            //Approach 1
 //            ExecutorService service = Executors.newCachedThreadPool();
 //            try {
 //                Future<Iterator<byte[]>> future = service.submit(new Approach1(fetched, uri, analyzer, sink));
@@ -267,6 +273,14 @@ public class WorkerImpl implements Worker, Closeable {
 //            catch(Exception e) {
 //                e.printStackTrace();
 //            }
+
+            List<File> fetchedFiles = new ArrayList<>();
+            if (fetched != null && fetched.isDirectory()) {
+                fetchedFiles.addAll(TempPathUtils.searchPath4Files(fetched));
+            } else {
+                fetchedFiles.add(fetched);
+            }
+
 
 //             If there is at least one file
             if (fetchedFiles.size() > 0) {
@@ -295,7 +309,7 @@ public class WorkerImpl implements Worker, Closeable {
                     activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
                     activity.setState(CrawlingURIState.FAILED);
                     activity.finishActivity(sink);
- //                   throw e;      ### WRITE LOGIC TO HANDLE THE EXCEPTIONS THROWN BY EXECUTOR SERVICE
+                    e.printStackTrace();
                 } finally {
                     // We don't want to handle any exception. Just make sure that sink and collector
                     // do not handle this uri anymore.
