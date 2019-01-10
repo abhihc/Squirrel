@@ -4,7 +4,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.net.URI;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -238,19 +237,6 @@ public class WorkerImpl implements Worker, Closeable {
                 LOGGER.warn("Delay before crawling \"" + uri.getUri().toString() + "\" interrupted.", e);
             }
 
-//            //Approach 3
-//            ExecutorService service = Executors.newCachedThreadPool();
-//            try {
-//                Future<Iterator<byte[]>> future = service.submit(new Approach3(uri, fetcher, analyzer, sink));
-//                service.shutdown();
-//                sendNewUris(future.get());
-//            }
-//
-//            catch(Exception e) {
-//                e.printStackTrace();
-//            }
-
-
             // Fetch the URI content
             LOGGER.debug("I start crawling {} now...", uri);
             File fetched = null;
@@ -262,18 +248,6 @@ public class WorkerImpl implements Worker, Closeable {
             }
             timeStampLastUriFetched = System.currentTimeMillis();
 
-            //Approach 1
-//            ExecutorService service = Executors.newCachedThreadPool();
-//            try {
-//                Future<Iterator<byte[]>> future = service.submit(new Approach1(fetched, uri, analyzer, sink));
-//                service.shutdown();
-//                sendNewUris(future.get());
-//            }
-//
-//            catch(Exception e) {
-//                e.printStackTrace();
-//            }
-
             List<File> fetchedFiles = new ArrayList<>();
             if (fetched != null && fetched.isDirectory()) {
                 fetchedFiles.addAll(TempPathUtils.searchPath4Files(fetched));
@@ -281,8 +255,7 @@ public class WorkerImpl implements Worker, Closeable {
                 fetchedFiles.add(fetched);
             }
 
-
-//             If there is at least one file
+            //  If there is at least one file
             if (fetchedFiles.size() > 0) {
                 FileManager fm = new FileManager();
                 List<File> fileList;
@@ -297,8 +270,8 @@ public class WorkerImpl implements Worker, Closeable {
                             for (File file : fileList) {
 //                                Iterator<byte[]> resultUris = analyzer.analyze(uri, file, sink);
 //                                sendNewUris(resultUris);
-                                ExecutorService service = Executors.newCachedThreadPool();//Approach 2
-                                Future<Iterator<byte[]>> future = service.submit(new Approach2(file, uri, analyzer, sink));
+                                ExecutorService service = Executors.newCachedThreadPool();
+                                Future<Iterator<byte[]>> future = service.submit(new MyCallable(file, uri, analyzer, sink));
                                 service.shutdown();
                                 sendNewUris(future.get());
                             }
@@ -359,7 +332,7 @@ public class WorkerImpl implements Worker, Closeable {
 
     /**
      * Sends the given URIs to the frontier.
-     * 
+     *
      * @param uriIterator
      *            an iterator used to iterate over all new URIs
      */
