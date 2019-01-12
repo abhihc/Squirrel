@@ -8,7 +8,7 @@ import java.io.File;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 
-public class MyCallable implements Callable<Iterator<byte[]>> {
+public class AnalyzerCallable implements Callable<Iterator<byte[]>> {
     private File decompressedFile;
     private Analyzer analyzer;
     private Sink sink;
@@ -20,7 +20,7 @@ public class MyCallable implements Callable<Iterator<byte[]>> {
         return analyzer.analyze(uri, decompressedFile, sink);
     }
 
-    MyCallable(File file, CrawleableUri uri, Analyzer analyzer, Sink sink) {
+    AnalyzerCallable(File file, CrawleableUri uri, Analyzer analyzer, Sink sink) {
         this.decompressedFile = file;
         this.uri = uri;
         this.analyzer = analyzer;

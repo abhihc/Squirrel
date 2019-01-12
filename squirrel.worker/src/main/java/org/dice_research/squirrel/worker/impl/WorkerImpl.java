@@ -4,12 +4,12 @@ import java.io.Closeable;
 import java.io.File;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.dice_research.squirrel.Constants;
 import org.dice_research.squirrel.analyzer.Analyzer;
-import org.dice_research.squirrel.analyzer.compress.impl.FileManager;
 import org.dice_research.squirrel.analyzer.manager.SimpleOrderedAnalyzerManager;
 import org.dice_research.squirrel.collect.SqlBasedUriCollector;
 import org.dice_research.squirrel.collect.UriCollector;
@@ -29,7 +29,6 @@ import org.dice_research.squirrel.sink.Sink;
 import org.dice_research.squirrel.uri.processing.UriProcessor;
 import org.dice_research.squirrel.uri.processing.UriProcessorInterface;
 import org.dice_research.squirrel.utils.Closer;
-import org.dice_research.squirrel.utils.TempPathUtils;
 import org.dice_research.squirrel.worker.Worker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,29 +79,27 @@ public class WorkerImpl implements Worker, Closeable {
     private final int id = (int) Math.floor(Math.random() * 100000);
     private boolean sendAliveMessages;
 
+    ExecutorService service1 = Executors.newCachedThreadPool();
+    ExecutorService service2 = Executors.newCachedThreadPool();
+    ExecutorService service3 = Executors.newCachedThreadPool();
+
+
     /**
      * Constructor.
      *
-     * @param frontier
-     *            Frontier implementation used by this worker to get URI sets and
-     *            send new URIs to.
-     * @param sink
-     *            Sink used by this worker to store crawled data.
-     * @param manager
-     *            RobotsManager for handling robots.txt files.
-     * @param serializer
-     *            Serializer for serializing and deserializing URIs.
-     * @param collector
-     *            The UriCollector implementation used by this worker.
-     * @param waitingTime
-     *            Time (in ms) the worker waits when the given frontier couldn't
-     *            provide any URIs before requesting new URIs again.
-     * @param logDir
-     *            The directory to which a domain log will be written (or
-     *            {@code null} if no log should be written).
+     * @param frontier    Frontier implementation used by this worker to get URI sets and
+     *                    send new URIs to.
+     * @param sink        Sink used by this worker to store crawled data.
+     * @param manager     RobotsManager for handling robots.txt files.
+     * @param serializer  Serializer for serializing and deserializing URIs.
+     * @param collector   The UriCollector implementation used by this worker.
+     * @param waitingTime Time (in ms) the worker waits when the given frontier couldn't
+     *                    provide any URIs before requesting new URIs again.
+     * @param logDir      The directory to which a domain log will be written (or
+     *                    {@code null} if no log should be written).
      */
-    public WorkerImpl(Frontier frontier, Sink sink,Analyzer analyzer, RobotsManager manager, Serializer serializer,
-            UriCollector collector, long waitingTime, String logDir, boolean sendAliveMessages) {
+    public WorkerImpl(Frontier frontier, Sink sink, Analyzer analyzer, RobotsManager manager, Serializer serializer,
+                      UriCollector collector, long waitingTime, String logDir, boolean sendAliveMessages) {
         this.frontier = frontier;
         this.sink = sink;
         this.analyzer = analyzer;
@@ -123,12 +120,11 @@ public class WorkerImpl implements Worker, Closeable {
         }
         this.collector = collector;
         fetcher = new SimpleOrderedFetcherManager(
-                // new SparqlBasedFetcher(),
-                new HTTPFetcher(), new SimpleCkanFetcher(), new FTPFetcher(), new SparqlBasedFetcher());
+            // new SparqlBasedFetcher(),
+            new HTTPFetcher(), new SimpleCkanFetcher(), new FTPFetcher(), new SparqlBasedFetcher());
 
         analyzer = new SimpleOrderedAnalyzerManager(collector);
     }
-
 
 
     @Override
@@ -164,7 +160,7 @@ public class WorkerImpl implements Worker, Closeable {
     public List<String> ckanwhitelist() {
 
         List<String> ckanlist = Arrays.asList("https://demo.ckan.org", "http://open.canada.ca/data/en/",
-                "http://datahub.io/");
+            "http://datahub.io/");
         // This block can be used to feed list of CKANURLs for comparision
         // In case of using this, please create ckanwhitelist.txt in whitelist folder
         // under root
@@ -207,14 +203,13 @@ public class WorkerImpl implements Worker, Closeable {
                     performCrawling(uri);
                 } catch (Exception e) {
                     LOGGER.error("Unhandled exception while crawling \"" + uri.getUri().toString()
-                            + "\". It will be ignored.", e);
+                        + "\". It will be ignored.", e);
                 }
             }
         }
         // send results to the Frontier
         frontier.crawlingDone(uris);
     }
-
 
 
     @Override
@@ -229,7 +224,7 @@ public class WorkerImpl implements Worker, Closeable {
             // Make sure that there is a delay between the fetching of two URIs
             try {
                 long delay = timeStampLastUriFetched
-                        - (System.currentTimeMillis() + manager.getMinWaitingTime(uri.getUri()));
+                    - (System.currentTimeMillis() + manager.getMinWaitingTime(uri.getUri()));
                 if (delay > 0) {
                     Thread.sleep(delay);
                 }
@@ -248,53 +243,93 @@ public class WorkerImpl implements Worker, Closeable {
             }
             timeStampLastUriFetched = System.currentTimeMillis();
 
-            List<File> fetchedFiles = new ArrayList<>();
-            if (fetched != null && fetched.isDirectory()) {
-                fetchedFiles.addAll(TempPathUtils.searchPath4Files(fetched));
-            } else {
-                fetchedFiles.add(fetched);
-            }
+            //New incomplete approach
+//            List<Future> allFutures = new ArrayList<>();
+//            for ( File file : fetched) {
+//                Future<File> future1 = service1.submit(new DecompressCallable(file, uri, sink, collector, activity));
+//            }
+//
+//
+//            try{
+//                for(File file : future1.get()){
+//                    Future<Iterator<byte[]>> future = service2.submit(new AnalyzerCallable(file, uri, analyzer, sink));
+//                                service2.shutdown();
+//                                sendNewUris(future.get());
+//
+//                }
+//
+//            }catch (Exception e) {
+//                    activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
+//                    activity.setState(CrawlingURIState.FAILED);
+//                    activity.finishActivity(sink);
+//                    e.printStackTrace();
+//                } finally {
+//                    // We don't want to handle any exception. Just make sure that sink and collector
+//                    // do not handle this uri anymore.
+//                    sink.closeSinkForUri(uri);
+//                    collector.closeSinkForUri(uri);
+//                }
+//                // If we reach this point, the crawling was successful
+//                activity.setState(CrawlingURIState.SUCCESSFUL);
 
-            //  If there is at least one file
-            if (fetchedFiles.size() > 0) {
-                FileManager fm = new FileManager();
-                List<File> fileList;
-                try {
-                    // open the sink only if a fetcher has been found
-                    sink.openSinkForUri(uri);
-                    collector.openSinkForUri(uri);
-                    // Go over all files and analyze them
-                    for (File data : fetchedFiles) {
-                        if (data != null) {
-                            fileList = fm.decompressFile(data);
-                            for (File file : fileList) {
-//                                Iterator<byte[]> resultUris = analyzer.analyze(uri, file, sink);
-//                                sendNewUris(resultUris);
-                                ExecutorService service = Executors.newCachedThreadPool();
-                                Future<Iterator<byte[]>> future = service.submit(new MyCallable(file, uri, analyzer, sink));
-                                service.shutdown();
-                                sendNewUris(future.get());
+            //Handled in ExtractCallable class
+//            List<File> fetchedFiles = new ArrayList<>();
+//            if (fetched != null && fetched.isDirectory()) {
+//                fetchedFiles.addAll(TempPathUtils.searchPath4Files(fetched));
+//            } else {
+//                fetchedFiles.add(fetched);
+//            }
+
+            
+            Future<List<File>> fetchedFiles = service1.submit(new ExtractCallable(fetched));
+
+
+            try {
+                //If there is at least one file
+                if (fetchedFiles.get().size() > 0) {
+                    try {
+                        // open the sink only if a fetcher has been found
+                        sink.openSinkForUri(uri);
+                        collector.openSinkForUri(uri);
+                        // Go over all files and analyze them
+                        ArrayList<Future> allFutures = new ArrayList<>();
+
+                        for (File data : fetchedFiles.get()) {
+                            if (data != null) {
+                                Future<List<File>> fileList = service2.submit(new DecompressCallable(data));
+                                allFutures.add(fileList);
                             }
                         }
+
+                        for (int i = 0; i < allFutures.size(); i++) {
+                            //Iterator<byte[]> resultUris = analyzer.analyze(uri, file, sink);
+                            //sendNewUris(resultUris);
+                            Future<File> f = allFutures.get(i);
+                            Future<Iterator<byte[]>> future = service3.submit(new AnalyzerCallable(f.get(), uri, analyzer, sink));
+                            sendNewUris(future.get());
+                        }
+                    } catch (Exception e) {
+                        activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
+                        activity.setState(CrawlingURIState.FAILED);
+                        activity.finishActivity(sink);
+                        e.printStackTrace();
+                    } finally {
+                        // We don't want to handle any exception. Just make sure that sink and collector
+                        // do not handle this uri anymore.
+                        sink.closeSinkForUri(uri);
+                        collector.closeSinkForUri(uri);
                     }
-                }
-                catch (Exception e) {
-                    activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
+                    // If we reach this point, the crawling was successful
+                    activity.setState(CrawlingURIState.SUCCESSFUL);
+                } else {
+                    // There are no files
+                    activity.addStep(getClass(), "No files for analysis available.");
                     activity.setState(CrawlingURIState.FAILED);
-                    activity.finishActivity(sink);
-                    e.printStackTrace();
-                } finally {
-                    // We don't want to handle any exception. Just make sure that sink and collector
-                    // do not handle this uri anymore.
-                    sink.closeSinkForUri(uri);
-                    collector.closeSinkForUri(uri);
                 }
-                // If we reach this point, the crawling was successful
-                activity.setState(CrawlingURIState.SUCCESSFUL);
-            } else {
-                // There are no files
-                activity.addStep(getClass(), "No files for analysis available.");
-                activity.setState(CrawlingURIState.FAILED);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
             }
         } else {
             LOGGER.info("Crawling {} is not allowed by the RobotsManager.", uri);
@@ -333,8 +368,7 @@ public class WorkerImpl implements Worker, Closeable {
     /**
      * Sends the given URIs to the frontier.
      *
-     * @param uriIterator
-     *            an iterator used to iterate over all new URIs
+     * @param uriIterator an iterator used to iterate over all new URIs
      */
     public void sendNewUris(Iterator<byte[]> uriIterator) {
         List<CrawleableUri> newUris = new ArrayList<>(MAX_URIS_PER_MESSAGE);
@@ -347,7 +381,7 @@ public class WorkerImpl implements Worker, Closeable {
                 newUris.add(newUri);
                 if ((newUris.size() >= (packageCount + 1) * MAX_URIS_PER_MESSAGE) && uriIterator.hasNext()) {
                     frontier.addNewUris(
-                            new ArrayList<>(newUris.subList(packageCount * MAX_URIS_PER_MESSAGE, newUris.size())));
+                        new ArrayList<>(newUris.subList(packageCount * MAX_URIS_PER_MESSAGE, newUris.size())));
                     packageCount++;
                 }
             } catch (Exception e) {
