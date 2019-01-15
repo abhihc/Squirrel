@@ -3,8 +3,10 @@ package org.dice_research.squirrel.worker.impl;
 import org.dice_research.squirrel.analyzer.compress.impl.FileManager;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
 public class DecompressCallable implements Callable<List<File>> {
 

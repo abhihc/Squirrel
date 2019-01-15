@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-public class ExtractCallable implements Callable<List<File>> {
+public class ExtractFiles implements Callable<List<File>> {
 
     private File fetched;
 
@@ -18,7 +18,7 @@ public class ExtractCallable implements Callable<List<File>> {
 
     }
 
-    ExtractCallable(File fetched) {
+    ExtractFiles(File fetched) {
         this.fetched = fetched;
     }
 
