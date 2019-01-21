@@ -21,13 +21,13 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class SqlBasedUriCollectorTest {
-	
+
 	GzipJavaUriSerializer serializer;
 	String dbdir;
 	File file;
 	FileReader fr;
 	BufferedReader br;
-	
+
 	@Before
 	public void prepare() throws Exception {
 		serializer = new GzipJavaUriSerializer();
@@ -36,16 +36,16 @@ public class SqlBasedUriCollectorTest {
 		file = new File(classLoader.getResource("collector/mCloudURIs.txt").getFile());
 		fr = new FileReader(file);
 		br = new BufferedReader(fr);
-		
+
 	}
 
     @Test
     public void test() throws Exception {
-        
+
         CrawleableUri uri = new CrawleableUri(new URI("http://example.org/test1"));
 
         SqlBasedUriCollector collector = SqlBasedUriCollector.create(serializer, dbdir);
-        
+
         collector.openSinkForUri(uri);
 
 
@@ -59,27 +59,27 @@ public class SqlBasedUriCollectorTest {
         }
 
         Iterator<byte[]> iterator = collector.getUris(uri);
-        
+
         Set<String> listCuris = new TreeSet<String>();
-        
+
         while(iterator.hasNext()) {
         	listCuris.add( ((CrawleableUri) serializer.deserialize(iterator.next())).getUri().toString() );
 
         }
-        
+
         collector.closeSinkForUri(uri);
         Assert.assertEquals(expectedUris, listCuris);
 
 
     }
-    
+
     @Test
     public void testFile() throws Exception {
     	String sCurrentLine;
-    	
+
     	Set<URI> expectedUris = new TreeSet<URI>();
     	Set<URI> listUris = new TreeSet<URI>();
-    	
+
     	SqlBasedUriCollector collector = SqlBasedUriCollector.create(serializer, dbdir);
     	CrawleableUri uri = new CrawleableUri(new URI("http://example.org/test2"));
     	collector.openSinkForUri(uri);
@@ -88,18 +88,18 @@ public class SqlBasedUriCollectorTest {
 			expectedUris.add(new URI(sCurrentLine));
 			collector.addNewUri(uri, new CrawleableUri(new URI(sCurrentLine)));
 		}
-		
+
 		Iterator<byte[]> it = collector.getUris(uri);
 		while(it.hasNext()) {
 			listUris.add(new URI( ((CrawleableUri) serializer.deserialize(it.next())).getUri().toString() ));
 		}
-		
+
 
 		collector.closeSinkForUri(uri);
 		Assert.assertEquals(expectedUris.size(), listUris.size());
-		
-		
-    	
+
+
+
     }
 
 }
