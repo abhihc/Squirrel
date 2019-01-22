@@ -78,12 +78,12 @@ public class WorkerImpl implements Worker, Closeable {
     private final int id = (int) Math.floor(Math.random() * 100000);
     private boolean sendAliveMessages;
 
-    private ArrayList<Future<List<File>>> fetchedFilesList = new ArrayList<>();
-    private ArrayList<Future<List<File>>> allDecompressedFilesList = new ArrayList<>();
-    private ArrayList<Future<Iterator<byte[]>>> analyzedUris = new ArrayList<>();
+    private List<Future> fetchedFilesList = new ArrayList<>();
+    private List<Future> allDecompressedFilesList = new ArrayList<>();
+    private List<Future> analyzedUris = new ArrayList<>();
 
     //Executor service to handle three different Processes running parallelly.
-    ExecutorService service = Executors.newCachedThreadPool();
+    private ExecutorService service = Executors.newCachedThreadPool();
 
 
     /**
@@ -245,124 +245,39 @@ public class WorkerImpl implements Worker, Closeable {
             }
             timeStampLastUriFetched = System.currentTimeMillis();
 
-            //Handled in ExtractFiles class
-//            List<File> fetchedFiles = new ArrayList<>();
-//            if (fetched != null && fetched.isDirectory()) {
-//                fetchedFiles.addAll(TempPathUtils.searchPath4Files(fetched));
-//            } else {
-//                fetchedFiles.add(fetched);
-//            }
-
-            //This approach will execute 3 methods sequentially but internally the methods run parallelly
-//            //create a list to hold the Future object associated with AnalyzerCallable class
-//            ArrayList<Future<List<File>>> fetchedFilesList = new ArrayList<>();
-//
-//            //Place holder for extracted files from a directory.
-//            for (File file : fetched.listFiles()) {
-//                Future<List<File>> fetchedFiles = service.submit(new ExtractFiles(file));
-//                fetchedFilesList.add(fetchedFiles);
-//            }
-//
-//
-//            //If there is at least one file
-//            if (fetchedFilesList.size() > 0) { //fetchedFiles.get.size()
-//                try {
-//                    // open the sink only if a fetcher has been found
-//                    sink.openSinkForUri(uri);
-//                    collector.openSinkForUri(uri);
-//                    // Go over all files and analyze them
-//
-//                    ArrayList<Future<List<File>>> allDecompressedFilesList = new ArrayList<>();
-//
-//                    for (Future<List<File>> fetchedFIle : fetchedFilesList) {
-//                        if (fetchedFIle != null) {
-//                            Future<List<File>> fileList = service.submit(new DecompressCallable((File) fetchedFIle));
-//                            allDecompressedFilesList.add(fileList);
-//                        }
-//                    }
-//
-//                    ArrayList<Future<Iterator<byte[]>>> analyzedUris = new ArrayList<>();
-//
-//
-//                    for (Future<List<File>> decompressedFile : allDecompressedFilesList) {
-//                        //Iterator<byte[]> resultUris = analyzer.analyze(uri, file, sink);
-//                        //sendNewUris(resultUris);
-//
-//                        Future<Iterator<byte[]>> future = service.submit(new AnalyzerCallable((File) decompressedFile, uri, analyzer, sink));
-//                        analyzedUris.add(future);
-//                    }
-//
-//                    for (Future<Iterator<byte[]>> uris : analyzedUris) {
-//                        sendNewUris((Iterator<byte[]>) uris);
-//                    }
-//                } catch (Exception e) {
-//                    activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
-//                    activity.setState(CrawlingURIState.FAILED);
-//                    activity.finishActivity(sink);
-//                    e.printStackTrace();
-//                } finally {
-//                    // We don't want to handle any exception. Just make sure that sink and collector
-//                    // do not handle this uri anymore.
-//                    sink.closeSinkForUri(uri);
-//                    collector.closeSinkForUri(uri);
-//                }
-//                // If we reach this point, the crawling was successful
-//                activity.setState(CrawlingURIState.SUCCESSFUL);
-//            } else {
-//                // There are no files
-//                activity.addStep(getClass(), "No files for analysis available.");
-//                activity.setState(CrawlingURIState.FAILED);
-//            }
-
-
-
-            for (File file : fetched.listFiles()) {
-                Future<List<File>> fetchedFiles = service.submit(new ExtractFiles(file));
+            try {
+                Future<List<File>> fetchedFiles = service.submit(new ExtractFiles(fetched, activity));
                 fetchedFilesList.add(fetchedFiles);
-
-            //Should implement the logic on how to wait till atleast one file is found if not activity will set the crawling as failed.
-                //If there is at least one file
-                if (fetchedFilesList.size() > 0) {
-                    try {
-                        // open the sink only if a fetcher has been found
-                        sink.openSinkForUri(uri);
-                        collector.openSinkForUri(uri);
-                        // Go over all files and analyze them
-                        for (Future<List<File>> fetchedFIle : fetchedFilesList) {
-                            if (fetchedFIle != null) {
-                                Future<List<File>> fileList = service.submit(new DecompressCallable((File) fetchedFIle));
-                                allDecompressedFilesList.add(fileList);
-                            }
-
-                            for (Future<List<File>> decompressedFile : allDecompressedFilesList) {
-                                //Iterator<byte[]> resultUris = analyzer.analyze(uri, file, sink);
-                                //sendNewUris(resultUris);
-                                Future<Iterator<byte[]>> future = service.submit(new AnalyzerCallable((File) decompressedFile, uri, analyzer, sink));
-                                analyzedUris.add(future);
-                            }
-                        }
-                    } catch (Exception e) {
-                        activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
-                        activity.setState(CrawlingURIState.FAILED);
-                        activity.finishActivity(sink);
-                        e.printStackTrace();
-                    } finally {
-                        // We don't want to handle any exception. Just make sure that sink and collector
-                        // do not handle this uri anymore.
-                        sink.closeSinkForUri(uri);
-                        collector.closeSinkForUri(uri);
+                // open the sink only if a fetcher has been found
+                sink.openSinkForUri(uri);
+                collector.openSinkForUri(uri);
+                // Go over all files and analyze them
+                for (Future fetchedFile : fetchedFilesList) {
+                    if (fetchedFile != null) {
+                        Future<List<File>> fileList = service.submit(new DecompressCallable(fetchedFile));
+                        allDecompressedFilesList.add(fileList);
                     }
-                    // If we reach this point, the crawling was successful
-                    activity.setState(CrawlingURIState.SUCCESSFUL);
-                } else {
-                    // There are no files
-                    activity.addStep(getClass(), "No files for analysis available.");
-                    activity.setState(CrawlingURIState.FAILED);
+
+                    for (Future decompressedFile : allDecompressedFilesList) {
+                        Future<Iterator<byte[]>> future = service.submit(new AnalyzerCallable(decompressedFile, uri, analyzer, sink));
+                        analyzedUris.add(future);
+                    }
                 }
+            } catch (Exception e) {
+                activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
+                activity.setState(CrawlingURIState.FAILED);
+                activity.finishActivity(sink);
+                e.printStackTrace();
             }
-            for (Future<Iterator<byte[]>> uris : analyzedUris) {
-                sendNewUris((Iterator<byte[]>) uris);
-            }
+
+            activity.setState(CrawlingURIState.SUCCESSFUL);
+
+//            for (Future<Iterator<byte[]>> uris : analyzedUris) {
+//                sendNewUris((Iterator<byte[]>) uris);
+//            }
+
+            sink.closeSinkForUri(uri);
+            collector.closeSinkForUri(uri);
         } else {
             LOGGER.info("Crawling {} is not allowed by the RobotsManager.", uri);
             activity.addStep(manager.getClass(), "Decided to reject this URI.");
