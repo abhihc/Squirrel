@@ -80,7 +80,7 @@ public class WorkerImpl implements Worker, Closeable {
 
     private List<Future> fetchedFilesList = new ArrayList<>();
     private List<Future> allDecompressedFilesList = new ArrayList<>();
-    private List<Future> analyzedUris = new ArrayList<>();
+    private ArrayList<Future<Iterator<byte[]>>> analyzedUris = new ArrayList<>();
 
     //Executor service to handle three different Processes running parallelly.
     private ExecutorService service = Executors.newCachedThreadPool();
@@ -263,6 +263,11 @@ public class WorkerImpl implements Worker, Closeable {
                         analyzedUris.add(future);
                     }
                 }
+                activity.setState(CrawlingURIState.SUCCESSFUL);
+
+                for (Future<Iterator<byte[]>> uris : analyzedUris) {
+                    sendNewUris(uris.get());
+                }
             } catch (Exception e) {
                 activity.addStep(getClass(), "Unhandled exception while Fetching Data. " + e.getMessage());
                 activity.setState(CrawlingURIState.FAILED);
@@ -270,11 +275,6 @@ public class WorkerImpl implements Worker, Closeable {
                 e.printStackTrace();
             }
 
-            activity.setState(CrawlingURIState.SUCCESSFUL);
-
-//            for (Future<Iterator<byte[]>> uris : analyzedUris) {
-//                sendNewUris((Iterator<byte[]>) uris);
-//            }
 
             sink.closeSinkForUri(uri);
             collector.closeSinkForUri(uri);
