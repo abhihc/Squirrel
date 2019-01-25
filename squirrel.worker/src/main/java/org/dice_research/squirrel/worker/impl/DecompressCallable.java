@@ -24,7 +24,9 @@ public class DecompressCallable implements Callable<List<File>> {
         this.fetched = fetched;
     }
 
-
+    /**
+     *Method used to decompress the file
+     */
     private List<File> decompressFile(File data) {
 
         FileManager fm = new FileManager();

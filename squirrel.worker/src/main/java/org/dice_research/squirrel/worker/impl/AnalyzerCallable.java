@@ -10,13 +10,16 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+
 public class AnalyzerCallable implements Callable<Iterator<byte[]>> {
     private Future<File> decompressedFile;
     private Analyzer analyzer;
     private Sink sink;
     private CrawleableUri uri;
 
-
+    /**
+     *Returns the new set of URIs found
+     */
     @Override
     public Iterator<byte[]> call() throws ExecutionException, InterruptedException {
         return analyzer.analyze(uri, decompressedFile.get(), sink);

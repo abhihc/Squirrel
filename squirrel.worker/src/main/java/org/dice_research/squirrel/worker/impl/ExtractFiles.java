@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+
 public class ExtractFiles implements Callable<List<File>> {
 
     private final CrawlingActivity activity;
@@ -27,7 +28,9 @@ public class ExtractFiles implements Callable<List<File>> {
         this.activity = activity;
     }
 
-
+    /**
+     *Method used to extract files from the directory
+     */
     private List<File> extractFilesFromDirectory(File file) {
         if (file == null) {
             // There are no files
